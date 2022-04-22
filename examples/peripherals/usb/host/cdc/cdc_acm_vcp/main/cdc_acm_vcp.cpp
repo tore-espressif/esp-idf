@@ -9,6 +9,7 @@
 #include "sdkconfig.h"
 #include "cp210x_usb.hpp"
 #include "ftdi_usb.hpp"
+#include "vcp_usb.hpp"
 #include "usb/usb_host.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -95,18 +96,16 @@ extern "C" void app_main(void)
         };
 
 #if defined(CONFIG_EXAMPLE_USE_FTDI)
-        FT23x *vcp;
-        try {
-            ESP_LOGI(TAG, "Opening FT232 UART device");
-            vcp = FT23x::open_ftdi(FTDI_FT232_PID, &dev_config);
-        }
+#define VCP_TYPE FT23x
 #else
-        CP210x *vcp;
-        try {
-            ESP_LOGI(TAG, "Opening CP210X device");
-            vcp = CP210x::open_cp210x(CP210X_PID, &dev_config);
-        }
+#define VCP_TYPE CP210x
 #endif
+
+        VcpUsb *vcp = NULL;
+        ESP_LOGI(TAG, "Opening USB UART device");
+        try {
+            vcp = VcpUsb::open<VCP_TYPE>(FTDI_FT232_PID, &dev_config);
+        }
         catch (esp_err_t err) {
             ESP_LOGE(TAG, "The required device was not opened.\nExiting...");
             return;
@@ -120,6 +119,7 @@ extern "C" void app_main(void)
             .bDataBits = EXAMPLE_DATA_BITS,
         };
         ESP_ERROR_CHECK(vcp->line_coding_set(&line_coding));
+        ESP_ERROR_CHECK(vcp->tx_blocking((uint8_t *)"test", 4));
 
         /*
         Now the USB-to-UART converter is configured and receiving data.
@@ -131,6 +131,6 @@ extern "C" void app_main(void)
 
         // We are done. Wait for device disconnection and start over
         xSemaphoreTake(device_disconnected_sem, portMAX_DELAY);
-        delete vcp;
+        delete vcp; //@todo this must be called automatically
     }
 }

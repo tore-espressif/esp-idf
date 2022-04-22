@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "usb/cdc_acm_host.h"
+#include "vcp_usb.hpp"
 
 #define FTDI_FT232_PID       (0x6001)
 #define FTDI_FT231_PID       (0x6015)
@@ -19,10 +19,12 @@
 #define FTDI_CMD_GET_MDMSTS   (0x05) // Modem status
 
 namespace esp_usb {
-class FT23x : public CdcAcmDevice {
+class FT23x : private CdcAcmDevice, virtual public VcpUsb {
 public:
     /**
      * @brief Factory method for this FTDI driver
+     *
+     * Opens device with specific PID
      *
      * @note USB Host library and CDC-ACM driver must be already installed
      *
@@ -31,7 +33,20 @@ public:
      * @param[in] interface_idx  Interface number
      * @return FT23x             Pointer to created and opened FTDI device
      */
-    static FT23x *open_ftdi(uint16_t pid, const cdc_acm_host_device_config_t *dev_config, uint8_t interface_idx = 0);
+    static FT23x *open(uint16_t pid, const cdc_acm_host_device_config_t *dev_config, uint8_t interface_idx = 0);
+
+    /**
+     * @brief Factory method for this FTDI driver
+     *
+     * Tries to open all PIDs that are supported and returns first successfully opened.
+     *
+     * @note USB Host library and CDC-ACM driver must be already installed
+     *
+     * @param[in] dev_config     CDC device configuration
+     * @param[in] interface_idx  Interface number
+     * @return FT23x             Pointer to created and opened FTDI device
+     */
+    static FT23x *open(const cdc_acm_host_device_config_t *dev_config, uint8_t interface_idx = 0);
 
     /**
      * @brief Set Line Coding method
@@ -52,6 +67,14 @@ public:
      * @return esp_err_t
      */
     esp_err_t set_control_line_state(bool dtr, bool rts);
+
+    // Use default implementations from CdcAcmDevice class
+    using CdcAcmDevice::tx_blocking;
+    esp_err_t tx_blocking(uint8_t *data, size_t len, uint32_t timeout_ms) {
+        return CdcAcmDevice::tx_blocking(data, len, timeout_ms);
+    }
+    using CdcAcmDevice::close;
+    esp_err_t close(void) { return CdcAcmDevice::close(); }
 
 private:
     /**
@@ -112,10 +135,6 @@ private:
     // Constructors are private, use factory method open_ftdi() to create this object
     FT23x();
     FT23x(uint16_t pid, const cdc_acm_host_device_config_t *dev_config, uint8_t interface_idx = 0);
-
-    // Make open functions from CdcAcmDevice class private
-    using CdcAcmDevice::open;
-    using CdcAcmDevice::open_vendor_specific;
 
     const uint8_t intf;
     const cdc_acm_data_callback_t user_data_cb;

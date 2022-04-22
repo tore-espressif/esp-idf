@@ -15,9 +15,15 @@
 #define FTDI_WRITE_REQ (USB_BM_REQUEST_TYPE_TYPE_VENDOR | USB_BM_REQUEST_TYPE_DIR_OUT)
 
 namespace esp_usb {
-FT23x *FT23x::open_ftdi(uint16_t pid, const cdc_acm_host_device_config_t *dev_config, uint8_t interface_idx)
+FT23x *FT23x::open(uint16_t pid, const cdc_acm_host_device_config_t *dev_config, uint8_t interface_idx)
 {
     return new FT23x(pid, dev_config, interface_idx);
+}
+
+FT23x *FT23x::open(const cdc_acm_host_device_config_t *dev_config, uint8_t interface_idx)
+{
+    //@todo try to open all PIDs
+    return new FT23x(FTDI_FT232_PID, dev_config, interface_idx);
 }
 
 FT23x::FT23x(uint16_t pid, const cdc_acm_host_device_config_t *dev_config, uint8_t interface_idx)
