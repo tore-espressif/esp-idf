@@ -116,6 +116,8 @@ private:
     // Make open functions from CdcAcmDevice class private
     using CdcAcmDevice::open;
     using CdcAcmDevice::open_vendor_specific;
+    using CdcAcmDevice::line_coding_get; // Not implemented
+    using CdcAcmDevice::send_break; // Not implemented
 
     const uint8_t intf;
     const cdc_acm_data_callback_t user_data_cb;

@@ -6,7 +6,7 @@
 (See the README.md file in the upper level 'examples' directory for more information about examples.)
 
 This example shows how to extend CDC-ACM driver for Virtual Communication Port devices,
-such as CP210x or FTDI FT23x devices.
+such as CP210x, FTDI FT23x or CP34x devices.
 
 ## How to use example
 
@@ -18,7 +18,7 @@ such as CP210x or FTDI FT23x devices.
 ### Hardware Required
 
 * ESP board with USB-OTG supported
-* Silicon Labs CP210x or FTDI FT23x USB to UART converter
+* Silicon Labs CP210x, FTDI FT23x or CP34x USB to UART converter
 
 Connect USB_D+, USB_D-, GND and +5V signals of your ESP chip to matching signals on USB to UART converter.
 

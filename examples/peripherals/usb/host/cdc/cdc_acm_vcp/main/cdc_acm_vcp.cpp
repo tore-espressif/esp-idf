@@ -9,6 +9,7 @@
 #include "sdkconfig.h"
 #include "cp210x_usb.hpp"
 #include "ftdi_usb.hpp"
+#include "ch34x_usb.hpp"
 #include "usb/usb_host.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -100,11 +101,17 @@ extern "C" void app_main(void)
             ESP_LOGI(TAG, "Opening FT232 UART device");
             vcp = FT23x::open_ftdi(FTDI_FT232_PID, &dev_config);
         }
-#else
+#elif defined(CONFIG_EXAMPLE_USE_CP210X)
         CP210x *vcp;
         try {
-            ESP_LOGI(TAG, "Opening CP210X device");
+            ESP_LOGI(TAG, "Opening CP210x device");
             vcp = CP210x::open_cp210x(CP210X_PID, &dev_config);
+        }
+#else
+        CH34x *vcp;
+        try {
+            ESP_LOGI(TAG, "Opening CH340 device");
+            vcp = CH34x::open_ch34x(CH340_PID_1, &dev_config);
         }
 #endif
         catch (esp_err_t err) {

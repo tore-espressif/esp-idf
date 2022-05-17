@@ -10,6 +10,8 @@ menu "Example Configuration"
             bool "FT232"
         config EXAMPLE_USE_CP210X
             bool "CP2012"
+        config EXAMPLE_USE_CH340
+            bool "CH340"
     endchoice
 
 endmenu
