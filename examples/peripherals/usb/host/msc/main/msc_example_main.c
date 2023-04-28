@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <assert.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -21,6 +22,10 @@
 #include "hal/usb_hal.h"
 #include "driver/gpio.h"
 #include <esp_vfs_fat.h>
+#include "esp_spiffs.h"
+
+/* SPIFFS mount root */
+#define FS_MNT_PATH  "/spiffs"
 
 #define USB_DISCONNECT_PIN  GPIO_NUM_10
 
@@ -58,59 +63,11 @@ static void print_device_info(msc_host_device_info_t *info)
     printf("\t Capacity: %llu MB\n", capacity);
     printf("\t Sector size: %"PRIu32"\n", info->sector_size);
     printf("\t Sector count: %"PRIu32"\n", info->sector_count);
-    printf("\t PID: 0x%4X \n", info->idProduct);
-    printf("\t VID: 0x%4X \n", info->idVendor);
+    printf("\t PID: 0x%04X \n", info->idProduct);
+    printf("\t VID: 0x%04X \n", info->idVendor);
     wprintf(L"\t iProduct: %S \n", info->iProduct);
     wprintf(L"\t iManufacturer: %S \n", info->iManufacturer);
     wprintf(L"\t iSerialNumber: %S \n", info->iSerialNumber);
-}
-
-static bool file_exists(const char *file_path)
-{
-    struct stat buffer;
-    return stat(file_path, &buffer) == 0;
-}
-
-static void file_operations(void)
-{
-    const char *directory = "/usb/esp";
-    const char *file_path = "/usb/esp/test.txt";
-
-    struct stat s = {0};
-    bool directory_exists = stat(directory, &s) == 0;
-    if (!directory_exists) {
-        if (mkdir(directory, 0775) != 0) {
-            ESP_LOGE(TAG, "mkdir failed with errno: %s\n", strerror(errno));
-        }
-    }
-
-    if (!file_exists(file_path)) {
-        ESP_LOGI(TAG, "Creating file");
-        FILE *f = fopen(file_path, "w");
-        if (f == NULL) {
-            ESP_LOGE(TAG, "Failed to open file for writing");
-            return;
-        }
-        fprintf(f, "Hello World!\n");
-        fclose(f);
-    }
-
-    FILE *f;
-    ESP_LOGI(TAG, "Reading file");
-    f = fopen(file_path, "r");
-    if (f == NULL) {
-        ESP_LOGE(TAG, "Failed to open file for reading");
-        return;
-    }
-    char line[64];
-    fgets(line, sizeof(line), f);
-    fclose(f);
-    // strip newline
-    char *pos = strchr(line, '\n');
-    if (pos) {
-        *pos = '\0';
-    }
-    ESP_LOGI(TAG, "Read from file: '%s'", line);
 }
 
 // Handles common USB host library events
@@ -159,19 +116,21 @@ void app_main(void)
     msc_host_device_info_t info;
     BaseType_t task_created;
 
-    const gpio_config_t input_pin = {
-        .pin_bit_mask = BIT64(USB_DISCONNECT_PIN),
-        .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_ENABLE,
+    const esp_vfs_spiffs_conf_t spiffs_conf = {
+        .base_path = FS_MNT_PATH,
+        .partition_label = NULL,
+        .max_files = 5,
+        .format_if_mount_failed = false
     };
-    ESP_ERROR_CHECK( gpio_config(&input_pin) );
+    /* Initialize SPI file system */
+    ESP_ERROR_CHECK( esp_vfs_spiffs_register(&spiffs_conf) );
 
     usb_flags = xEventGroupCreate();
     assert(usb_flags);
 
     const usb_host_config_t host_config = { .intr_flags = ESP_INTR_FLAG_LEVEL1 };
     ESP_ERROR_CHECK( usb_host_install(&host_config) );
-    task_created = xTaskCreate(handle_usb_events, "usb_events", 2048, NULL, 2, NULL);
+    task_created = xTaskCreate(handle_usb_events, "usb_events", 2 * 2048, NULL, 2, NULL);
     assert(task_created);
 
     const msc_host_driver_config_t msc_config = {
@@ -200,9 +159,23 @@ void app_main(void)
 
         ESP_ERROR_CHECK( msc_host_vfs_register(msc_device, "/usb", &mount_config, &vfs_handle) );
 
-        while (!wait_for_event(DEVICE_DISCONNECTED, 200)) {
-            file_operations();
+        ESP_LOGI(TAG, "Device connected ok, writing binary!");
+
+        FILE *original = fopen("/spiffs/blink.uf2", "r");
+        FILE *copy = fopen("/usb/blink.uf2", "w");
+        assert(original);
+        assert(copy);
+
+        int ch;
+        while( ( ch = fgetc(original) ) != EOF ) {
+            fputc(ch, copy);
         }
+        fclose(original);
+        fclose(copy);
+
+        ESP_LOGI(TAG, "Copy finished");
+
+        while (!wait_for_event(DEVICE_DISCONNECTED, 200)) {}
 
         xEventGroupClearBits(usb_flags, READY_TO_UNINSTALL);
         ESP_ERROR_CHECK( msc_host_vfs_unregister(vfs_handle) );
